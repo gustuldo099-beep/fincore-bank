@@ -1,0 +1,137 @@
+# ============================================================
+# FinCore Banking — Docker Compose
+# Ambiente seguro com PostgreSQL hardened + PgBouncer
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # PostgreSQL — Banco principal endurecido
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: fincore-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB:       postgres
+      PGDATA:            /var/lib/postgresql/data/pgdata
+      # Configurações de segurança via env
+    volumes:
+      # Scripts de inicialização (lidos em ordem alfabética)
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      # Dados persistentes (nunca perder o banco)
+      - postgres_data:/var/lib/postgresql/data
+      # Config customizada com hardening
+    ports:
+      - "5432:5432"
+    networks:
+      - fincore-internal
+      - fincore-external
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ----------------------------------------------------------
+  # PgBouncer — Connection pooling (protege o Postgres)
+  # ----------------------------------------------------------
+  pgbouncer:
+    image: bitnami/pgbouncer:latest
+    container_name: fincore-pgbouncer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_HOST:          postgres
+      POSTGRESQL_PORT:          5432
+      POSTGRESQL_USERNAME:      ${POSTGRES_USER}
+      POSTGRESQL_PASSWORD:      ${POSTGRES_PASSWORD}
+      PGBOUNCER_DATABASE:       fincore_auth
+      PGBOUNCER_PORT:           6432
+      PGBOUNCER_POOL_MODE:      transaction
+      PGBOUNCER_MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN}
+      PGBOUNCER_DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULT_POOL_SIZE}
+      PGBOUNCER_AUTH_TYPE:      scram-sha-256
+    ports:
+      - "127.0.0.1:6432:6432"
+    networks:
+      - fincore-internal
+
+  # ----------------------------------------------------------
+  # Auth Service
+  # ----------------------------------------------------------
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: fincore-auth
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      jdbc:postgresql://postgres:5432/${AUTH_DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${AUTH_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${AUTH_DB_PASSWORD}
+      JWT_SECRET:                 ${JWT_SECRET}
+      JWT_EXPIRATION:             ${JWT_EXPIRATION}
+      JWT_REFRESH_EXPIRATION:     ${JWT_REFRESH_EXPIRATION}
+      SPRING_PROFILES_ACTIVE:     docker
+    ports:
+      - "127.0.0.1:8081:8081"
+    networks:
+      - fincore-internal
+      - fincore-external
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ----------------------------------------------------------
+  # pgAdmin — Interface visual do banco (só em dev)
+  # ----------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: fincore-pgadmin
+    restart: unless-stopped
+    profiles: ["dev"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    admin@fincore.com
+      PGADMIN_DEFAULT_PASSWORD: pgAdmin#2024!
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "127.0.0.1:5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - fincore-internal
+    depends_on:
+      - postgres
+
+# ----------------------------------------------------------
+# Redes — isolamento entre serviços
+# ----------------------------------------------------------
+networks:
+  fincore-internal:
+    driver: bridge
+    name: fincore-internal
+  fincore-external:
+    driver: bridge
+    name: fincore-external
+
+# ----------------------------------------------------------
+# Volumes persistentes
+# ----------------------------------------------------------
+volumes:
+  postgres_data:
+    name: fincore-postgres-data
+  pgadmin_data:
+    name: fincore-pgadmin-data
