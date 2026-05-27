@@ -1,6 +1,6 @@
-package com.fincore.transaction.dto;
+package com.fincore.notification.dto;
 
-import com.fincore.transaction.model.PixTransaction;
+import com.fincore.notification.model.PixTransaction;
 import lombok.Builder;
 import lombok.Data;
 import java.math.BigDecimal;

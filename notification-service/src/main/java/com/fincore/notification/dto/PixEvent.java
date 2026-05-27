@@ -1,4 +1,4 @@
-package com.fincore.transaction.dto;
+package com.fincore.notification.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

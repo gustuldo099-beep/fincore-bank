@@ -1,4 +1,4 @@
-package com.fincore.transaction.model;
+package com.fincore.notification.model;
 
 import jakarta.persistence.*;
 import lombok.*;

@@ -1,7 +1,7 @@
-package com.fincore.transaction.repository;
+package com.fincore.notification.repository;
 
-import com.fincore.transaction.model.PixTransaction;
-import com.fincore.transaction.model.PixStatus;
+import com.fincore.notification.model.PixTransaction;
+import com.fincore.notification.model.PixStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -1,4 +1,4 @@
-package com.fincore.transaction.exception;
+package com.fincore.notification.exception;
 public class BusinessException extends RuntimeException {
     public BusinessException(String message) { super(message); }
 }

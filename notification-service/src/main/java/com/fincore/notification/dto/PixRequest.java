@@ -1,4 +1,4 @@
-package com.fincore.transaction.dto;
+package com.fincore.notification.dto;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
